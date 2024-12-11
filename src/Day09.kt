@@ -1,36 +1,12 @@
 fun main() {
 
-    data class Sector(
-        val startPos: Int,
-        val content: Int,
-        var length: Int,
-        var startPosFree: Int = startPos,
-        var lengthFree: Int = length
-    ) {
-        override fun toString(): String {
-            var s = ""
-            for (i in 0 until length) {
-                s += if (content == -1) {
-                    "."
-                } else {
-                    content
-                }
-            }
-            return s
-        }
-    }
-
-    fun Int.toSector(startPos: Int, content: Int): Sector {
-        return Sector(startPos, content, this)
-    }
-
     fun Int.addToList(content: Int, list: MutableList<Int>) {
         repeat(this) {
             list.add(content)
         }
     }
 
-    fun List<Int>.indexOfFirst(startIndex: Int, predicate: (Int) -> Boolean): Int {
+    fun List<Int>.indexOfFirst(startIndex: Int = 0, predicate: (Int) -> Boolean): Int {
         for (i in startIndex until this.size) {
             if (predicate(this[i])) {
                 return i
