@@ -1,8 +1,14 @@
-import kotlin.toString
+data class GridNode(var value: String, var costs: Long = Long.MAX_VALUE) {
+    override fun toString(): String {
+        if (costs != Long.MAX_VALUE) {
+            return String.format("%-5s", costs)
+        }
+        return value.repeat(5)
+    }
+}
 
-fun main() {
 
-    fun List<List<String>>.printGrid() {
+    fun List<List<GridNode>>.printGrid() {
         this.forEach { row ->
             row.forEach { node ->
                 print(node)
@@ -11,212 +17,203 @@ fun main() {
         }
     }
 
-    fun findOffset(x: Int, y: Int, grid: List<List<String>>, direction: Char): Int {
-        val directions = mapOf(
-            '<' to Pair(-1, 0),
-            '>' to Pair(1, 0),
-            '^' to Pair(0, -1),
-            'v' to Pair(0, 1)
-        )
-        val (dx, dy) = directions[direction] ?: Pair(0, 0)
-        var rightEdge = false
-        var leftEdge = false
-        if (direction == '^') {
-            rightEdge = grid[y - 1][x] == "]"
-            leftEdge = grid[y - 1][x] == "["
-        } else if (direction == 'v') {
-            rightEdge = grid[y + 1][x ] == "]"
-            leftEdge = grid[y + 1][x ] == "["
-        }
+fun main() {
 
-        var offset = 0
-        var newX = x + dx
-        var newY = y + dy
 
-        while (newY in grid.indices && newX in grid[newY].indices) {
-            if (
-                grid[newY][newX] == "#"
-                || (rightEdge && grid[newY][newX + 1] == "#")
-                || (leftEdge && grid[newY][newX - 1] == "#")
-            )
-                return 0
-            if (grid[newY][newX] == ".") return offset + 1
-            newX += dx
-            newY += dy
-            offset++
-        }
-//        while (true) {
-//            if (grid[newY][newX] == "#") {
-//                return 0
-//            }
-//            offset++
-//            if (grid[newY][newX] == ".") {
-//                return offset
-//            }
-//            newX += dx
-//            newY += dy
-//        }
-        return offset
-    }
 
-    fun findCurrentPosition(grid: List<List<String>>): Pair<Int, Int> {
+    fun findStartPosition(grid: List<List<GridNode>>, posToFind: String): Point {
         grid.forEachIndexed { y, row ->
-            row.forEachIndexed { x, value ->
-                if (value == "@") return Pair(x, y)
+            row.forEachIndexed { x, node ->
+                if (node.value == posToFind) return Point(x, y)
             }
         }
-        return Pair(0, 0)
+        return Point(0, 0)
     }
 
-    fun moveInGrid(grid: List<MutableList<String>>, command: Char) {
-        val (currentX, currentY) = findCurrentPosition(grid)
-        val offset = findOffset(currentX, currentY, grid, command)
-//            println("X: $currentX, Y; $currentY, Offset: $offset, command: $command")
-        if (command == '^') {
-            for (y in currentY - offset until currentY) {
-                grid[y][currentX] = grid[y + 1][currentX]
-            }
-        } else if (command == 'v') {
-            for (y in currentY + offset downTo currentY + 1) {
-                grid[y][currentX] = grid[y - 1][currentX]
-            }
-
-        } else if (command == '<') {
-            for (x in currentX - offset until currentX) {
-                grid[currentY][x] = grid[currentY][x + 1]
-            }
-
-        } else if (command == '>') {
-            for (x in currentX + offset downTo currentX + 1) {
-                grid[currentY][x] = grid[currentY][x - 1]
-            }
-        }
-        if (offset > 0) {
-            grid[currentY][currentX] = "."
-        }
-
+    fun nextPosition(direction: Direction, x: Int, y: Int): DirectedPoint = when (direction) {
+        Direction.LEFT -> DirectedPoint(Point(x - 1, y), direction)
+        Direction.UP -> DirectedPoint(Point(x, y - 1), direction)
+        Direction.RIGHT -> DirectedPoint(Point(x + 1, y), direction)
+        Direction.DOWN -> DirectedPoint(Point(x, y + 1), direction)
     }
 
-    fun calculateGpsSum(grid: List<List<String>>): Int {
-        var gpsSum = 0
-        for (x in grid.indices) {
-            for (y in grid[x].indices) {
-                if (grid[x][y] == "O") {
-                    gpsSum += 100 * x + y
-                }
+    fun bfs(grid: List<List<GridNode>>) {
+        val queue = mutableListOf<DirectedPoint>()
+        val start = DirectedPoint(findStartPosition(grid, "S"), Direction.RIGHT)
+        queue.add(start)
+        grid[start.y][start.x].costs = 0
+        while (queue.isNotEmpty()) {
+            val current = queue.removeAt(0)
+            val (x, y) = current.point
+            val direction = current.direction
+
+            val cost = grid[y][x].costs
+            val newPosStraight = nextPosition(direction, x, y)
+            val newPosAfterLeftTurn = nextPosition(direction.turnLeft(), x, y)
+            val newPosAfterRightTurn = nextPosition(direction.turnRight(), x, y)
+            if (grid[newPosStraight.y][newPosStraight.x].costs > cost + 1 && grid.isFree(newPosStraight)) {
+                grid[newPosStraight.y][newPosStraight.x].costs = cost + 1
+                queue.add(newPosStraight)
+            }
+            if (grid[newPosAfterLeftTurn.y][newPosAfterLeftTurn.x].costs > cost + 1 + 1000 && grid.isFree(
+                    newPosAfterLeftTurn
+                )
+            ) {
+                grid[newPosAfterLeftTurn.y][newPosAfterLeftTurn.x].costs = cost + 1 + 1000
+                queue.add(newPosAfterLeftTurn)
+            }
+            if (grid[newPosAfterRightTurn.y][newPosAfterRightTurn.x].costs > cost + 1 + 1000 && grid.isFree(
+                    newPosAfterRightTurn
+                )
+            ) {
+                grid[newPosAfterRightTurn.y][newPosAfterRightTurn.x].costs = cost + 1 + 1000
+                queue.add(newPosAfterRightTurn)
             }
         }
-        return gpsSum
+    }
+
+    fun bfsReverse(grid: List<List<GridNode>>): Set<DirectedPoint> {
+        val goodPositions = mutableSetOf<DirectedPoint>()
+        val queue = mutableListOf<DirectedPoint>()
+        val startPos = findStartPosition(grid, "E")
+        val start1 = DirectedPoint(startPos, Direction.LEFT, grid[startPos.y][startPos.x].costs)
+        val start2 = DirectedPoint(startPos, Direction.DOWN, grid[startPos.y][startPos.x].costs)
+        goodPositions.add(start1)
+        queue.add(start1)
+        queue.add(start2)
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeAt(0)
+            val (x, y) = current.point
+            val cost = current.cost
+            val direction = current.direction
+
+            val newPosStraight = nextPosition(direction, x, y)
+            val newPosAfterLeftTurn = nextPosition(direction.turnLeft(), x, y)
+            val newPosAfterRightTurn = nextPosition(direction.turnRight(), x, y)
+
+            val newCostStraight = cost - 1
+            val newCostLeft = cost - 1 - 1000
+            val newCostRight = cost - 1 - 1000
+
+            val costStraight = grid[newPosStraight.y][newPosStraight.x].costs
+            val costLeft = grid[newPosAfterLeftTurn.y][newPosAfterLeftTurn.x].costs
+            val costRight = grid[newPosAfterRightTurn.y][newPosAfterRightTurn.x].costs
+
+            if ((newCostStraight == costStraight || newCostStraight - 1000 == costStraight) && grid.isFree(
+                    newPosStraight
+                )
+            ) {
+                queue.add(newPosStraight.copy(cost = newCostStraight))
+                goodPositions.add(newPosStraight)
+            }
+            if ((newCostLeft == costLeft || newCostLeft - 1000 == costLeft) && grid.isFree(newPosAfterLeftTurn)) {
+                queue.add(newPosAfterLeftTurn.copy(cost = newCostLeft))
+                goodPositions.add(newPosAfterLeftTurn)
+            }
+            if ((newCostRight == costRight || newCostRight - 1000 == costRight) && grid.isFree(newPosAfterRightTurn)) {
+                queue.add(newPosAfterRightTurn.copy(cost = newCostRight))
+                goodPositions.add(newPosAfterRightTurn)
+            }
+        }
+        return goodPositions
+    }
+
+//    fun move(
+//        pos: Point,
+//        currentDirection: Direction,
+//        grid: MutableList<MutableList<GridNode>>,
+//        currentPath: MutableList<Point>,
+//        successfulPaths: MutableList<BestCostPath>,
+//        costs: Long,
+//        target: String = "E"
+//    ) {
+//        val (x, y) = pos
+//        if (grid[y][x].value == "#") {
+//            return
+//        }
+//        if (costs > grid[y][x].costs) {
+//            println("Current costs $costs are higher than ${grid[y][x].costs} at ($x,$y)")
+//            return
+//        }
+//        if (grid[y][x].value == target) {
+//            println("#################")
+//            println("Found exit at $pos with costs $costs")
+//            println("#################")
+//            successfulPaths.add(BestCostPath(currentPath + pos, costs))
+//            return
+//        }
+//
+//        grid[y][x].costs = costs
+////        currentPath.add(grid[y][x])
+//        val newCurrentPath = currentPath.toMutableList()
+//        newCurrentPath.add(pos)
+//        val newPosStraight = nextPosition(currentDirection, x, y)
+//        val newPosAfterLeftTurn = nextPosition(currentDirection.turnLeft(), x, y)
+//        val newPosAfterRightTurn = nextPosition(currentDirection.turnRight(), x, y)
+//
+//        move(
+//            newPosAfterLeftTurn,
+//            currentDirection.turnLeft(),
+//            grid,
+//            newCurrentPath,
+//            successfulPaths,
+//            costs + 1 + 1000,
+//            target
+//        )
+//        move(
+//            newPosAfterRightTurn,
+//            currentDirection.turnRight(),
+//            grid,
+//            newCurrentPath,
+//            successfulPaths,
+//            costs + 1 + 1000,
+//            target
+//        )
+//        move(newPosStraight, currentDirection, grid, newCurrentPath, successfulPaths, costs + 1, target)
+//
+//    }
+
+
+    fun readGrid(input: List<String>): MutableList<MutableList<GridNode>> {
+        return input.map { line ->
+            line.map {
+                GridNode(it.toString())
+            }.toMutableList()
+        }.toMutableList()
     }
 
     fun part1(input: List<String>): Int {
-        val grid = input.dropLast(2).map { line -> line.map(Char::toString).toMutableList() }.toMutableList()
-        val commands = input.drop(input.size - 1)[0]
+        val grid = readGrid(input)
 
-        commands.forEach { command ->
-            moveInGrid(grid, command)
-        }
+        bfs(grid)
 
-
-
-        return calculateGpsSum(grid)
-
-//        return grid.sumOf { row -> row.indices.sumOf { y -> if (row[y] == "O") 100 * grid.indexOf(row) + y else 0 } }
+        val endPos = findStartPosition(grid, "E")
+        return grid[endPos.y][endPos.x].costs.toInt()
     }
 
-    fun moveInGridPart2(grid: List<MutableList<String>>, command: Char) {
-        val (currentX, currentY) = findCurrentPosition(grid)
-        val offset = findOffset(currentX, currentY, grid, command)
-//            println("X: $currentX, Y; $currentY, Offset: $offset, command: $command")
-        if (command == '^') {
-            val rightEdge = grid[currentY - 1][currentX] == "]"
-            val leftEdge = grid[currentY - 1][currentX] == "["
-            for (y in currentY - offset until currentY) {
-                grid[y][currentX] = grid[y + 1][currentX]
-                if(rightEdge) {
-                    grid[y][currentX + 1] = grid[y + 1][currentX + 1]
-                    grid[y][currentX - 1] = grid[y + 1][currentX - 1]
-                    grid[y][currentX -2] = grid[y + 1][currentX - 2]
-                } else if(leftEdge) {
-                    grid[y][currentX + 1] = grid[y + 1][currentX + 1]
-                    grid[y][currentX - 1] = grid[y + 1][currentX - 1]
-                    grid[y][currentX + 2] = grid[y + 1][currentX + 2]
-                }
-//                if (grid[y + 1][currentX + 1] == "]" || grid[y + 1][currentX + 1] == "[") {
-//                    grid[y][currentX + 1] = grid[y + 1][currentX + 1]
-//                }
-//                if (grid[y + 1][currentX - 1] == "]" || grid[y + 1][currentX - 1] == "[") {
-//                    grid[y][currentX - 1] = grid[y + 1][currentX - 1]
-//                }
-
-                grid.printGrid()
-            }
-            if (offset > 0) {
-                grid[currentY][currentX] = "."
-                if (rightEdge) {
-                    grid[currentY][currentX - 1] = "."
-                }
-                if (leftEdge) {
-                    grid[currentY][currentX + 1] = "."
-                }
-            }
-        } else if (command == 'v') {
-            for (y in currentY + offset downTo currentY + 1) {
-                grid[y][currentX] = grid[y - 1][currentX]
-            }
-
-        } else if (command == '<') {
-            for (x in currentX - offset until currentX) {
-                grid[currentY][x] = grid[currentY][x + 1]
-            }
-
-        } else if (command == '>') {
-            for (x in currentX + offset downTo currentX + 1) {
-                grid[currentY][x] = grid[currentY][x - 1]
-            }
-        }
-        if (offset > 0) {
-            grid[currentY][currentX] = "."
-        }
-
-    }
 
     fun part2(input: List<String>): Int {
-        val grid = input.dropLast(2).map { line ->
-            line.flatMap {
-                when (it) {
-                    '.' -> listOf(".", ".")
-                    '#' -> listOf("#", "#")
-                    'O' -> listOf("[", "]")
-                    '@' -> listOf("@", ".")
-                    else -> listOf(it.toString())
-                }
-            }.toMutableList()
-        }.toMutableList()
-        println(grid)
-        val commands = input.drop(input.size - 1)[0]
+        val grid = readGrid(input)
 
-        grid.printGrid()
-        println(commands)
+        bfs(grid)
+        val positions = bfsReverse(grid)
+        return positions.size
 
-        commands.forEach { command ->
-            moveInGridPart2(grid, command)
-            grid.printGrid()
-        }
-        return 0
     }
 
 // Test if implementation meets criteria from the description, like:
 //    check(part1(listOf("test_input")) == 1)
 
 // Or read a large test input from the `src/Day02_test.txt` file:
-    val testInput = readInput("Day15_test")
-    part2(testInput).println()
+    val testInput = readInput("Day16_test")
+//    part1(testInput).println()
+//    part2(testInput).println()
 //    check(part1(testInput) == 2)
 //    check(part2(testInput) == 9)
 
 // Read the input from the `src/Day01.txt` file.
-    val input = readInput("Day15")
-//    part1(input).println()
-//    part2(input).println()
+    val input = readInput("Day16")
+    part1(input).println()
+    part2(input).println()
 }
