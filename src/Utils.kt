@@ -23,6 +23,9 @@ fun Any?.println() = println(this)
 
 //TODO: make these classes generic
 data class Point(val x: Int, val y: Int) {
+    fun distanceTo(other: Point): Int {
+        return abs(x - other.x) + abs(y - other.y)
+    }
 }
 data class PointLong(val x: Long, val y: Long) {
 }

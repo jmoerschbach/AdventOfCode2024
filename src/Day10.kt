@@ -1,4 +1,3 @@
-data class Point(val y: Int, val x: Int)
 typealias Path = List<Point>
 
 fun main() {

@@ -142,6 +142,6 @@ fun main() {
 
 // Read the input from the `src/Day01.txt` file.
     val input = readInput("Day03")
-    part12(input).println()
+    part1(input).println()
     part2(input).println()
 }
